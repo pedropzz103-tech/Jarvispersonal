@@ -1,0 +1,9 @@
+import http from 'node:http';import {readFile} from 'node:fs/promises';import {WebSocketServer,WebSocket} from 'ws';
+const queues=new Map(),peers=new Map(),langs=new Map();
+const send=(s,o)=>{if(s?.readyState===WebSocket.OPEN)s.send(JSON.stringify(o))};
+function leave(s){const l=langs.get(s);if(l)queues.set(l,(queues.get(l)||[]).filter(x=>x!==s));const p=peers.get(s);peers.delete(s);if(p){peers.delete(p);send(p,{type:'left'})}}
+function join(s,l){leave(s);langs.set(s,l);const q=(queues.get(l)||[]).filter(x=>x.readyState===WebSocket.OPEN&&x!==s),p=q.shift();queues.set(l,q);if(p){peers.set(s,p);peers.set(p,s);send(s,{type:'matched'});send(p,{type:'matched'})}else{q.push(s);send(s,{type:'waiting'})}}
+const html=await readFile(new URL('./index.html',import.meta.url));
+const server=http.createServer((req,res)=>{if(req.url!=='/'){res.writeHead(404);return res.end()}res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','X-Content-Type-Options':'nosniff','Cache-Control':'no-store'});res.end(html)});
+new WebSocketServer({server,maxPayload:4096}).on('connection',s=>{s.on('message',raw=>{let m;try{m=JSON.parse(raw.toString())}catch{return}if(m.type==='join'&&['pt','en','es'].includes(m.lang))join(s,m.lang);if(m.type==='next'&&langs.has(s))join(s,langs.get(s));if(m.type==='message'&&typeof m.text==='string'&&m.text.trim())send(peers.get(s),{type:'message',text:m.text.slice(0,1000)});if(m.type==='report'){console.warn('Report received',new Date().toISOString());leave(s);send(s,{type:'reported'})}});s.on('close',()=>{leave(s);langs.delete(s)})});
+server.listen(process.env.PORT||3000);

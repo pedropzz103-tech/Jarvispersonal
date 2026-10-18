@@ -1,0 +1,20 @@
+name: Lumlynne tests
+on:
+  push:
+    branches: [feature/lumlynne-mvp]
+    paths: ['lumlynne/**', '.github/workflows/lumlynne-tests.yml']
+  pull_request:
+    paths: ['lumlynne/**', '.github/workflows/lumlynne-tests.yml']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lumlynne
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: node --test
